@@ -17,6 +17,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 WATCHLIST_FILE = "watchlist.json"
 LAST_DISCOUNTS_FILE = "last_discounts.json"
 
+
 def load_watchlist():
     try:
         with open(WATCHLIST_FILE, "r") as f:
@@ -24,19 +25,22 @@ def load_watchlist():
     except FileNotFoundError:
         return {}
 
+
 def save_watchlist(watchlist):
-    with open(WATCHLIST_FILE, 'w') as f:
+    with open(WATCHLIST_FILE, "w") as f:
         json.dump(watchlist, f, indent=2)
 
-def load_last_discounts() :
-    try :
-        with open(LAST_DISCOUNTS_FILE, 'r') as f:
+
+def load_last_discounts():
+    try:
+        with open(LAST_DISCOUNTS_FILE, "r") as f:
             return json.load(f)
     except FileNotFoundError:
         return {}
 
+
 def save_last_discounts(discounts):
-    with open(LAST_DISCOUNTS_FILE, 'w') as f:
+    with open(LAST_DISCOUNTS_FILE, "w") as f:
         json.dump(discounts, f, indent=2)
 
 
@@ -46,14 +50,18 @@ async def check_sales():
     last_known_discounts = load_last_discounts()
 
     for appid, watchers in watchlist.items():
-        details_url = f"https://store.steampowered.com/api/appdetails?appids={appid}"
-        details_res = requests.get(details_url)
-        details_data = details_res.json()
+        try:
+            details_url = f"https://store.steampowered.com/api/appdetails?appids={appid}"
+            details_res = requests.get(details_url)
+            details_data = details_res.json()
 
-        game_data = details_data[appid]["data"]
-        name = game_data["name"]
-        price_overview = game_data.get("price_overview", {})
-        discount = price_overview.get("discount_percent", 0)
+            game_data = details_data[appid]["data"]
+            name = game_data["name"]
+            price_overview = game_data.get("price_overview", {})
+            discount = price_overview.get("discount_percent", 0)
+        except Exception as e:
+            print(f"Failed to check app id {appid}, {e}")
+            continue
 
         last_discount = last_known_discounts.get(appid, 0)
 
@@ -72,26 +80,28 @@ async def check_sales():
 
         last_known_discounts[appid] = discount
         await asyncio.sleep(1)
+
     save_last_discounts(last_known_discounts)
 
-
 @bot.event
-async def on_ready() :
+async def on_ready():
     print(f"Logged in as {bot.user}")
     check_sales.start()
+
 
 @bot.event
 async def on_message(message):
     print(f"Received: {message.content} from {message.author}")
     await bot.process_commands(message)
 
+
 @bot.command()
-async def ping(ctx) :
+async def ping(ctx):
     await ctx.send("Pong!")
 
 
 @bot.command()
-async def watch(ctx, link) :
+async def watch(ctx, link):
     try:
         parts = link.split("/")
         app_index = parts.index("app")
@@ -108,14 +118,13 @@ async def watch(ctx, link) :
     already_watching = any(w["user_id"] == ctx.author.id for w in watchlist[appid])
 
     if not already_watching:
-        watchlist[appid].append({
-            "user_id": ctx.author.id,
-            "channel_id": ctx.channel.id
-        })
+        watchlist[appid].append(
+            {"user_id": ctx.author.id, "channel_id": ctx.channel.id}
+        )
 
     save_watchlist(watchlist)
 
     await ctx.send(f"Got it! watching for {appid}")
 
 
-bot.run(token) #Must always be at the bottom
+bot.run(token)  # Must always be at the bottom
