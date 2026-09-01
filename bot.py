@@ -200,4 +200,20 @@ async def unwatch(ctx, *, game):
 
     await ctx.send(f"Stopped watching {name}")
 
+@bot.command()
+async def mylist(ctx):
+    watchlist = load_watchlist()
+
+    watching = [
+        info["name"] for info in watchlist.values()
+        if any(w["user_id"] == ctx.author.id for w in info["watchers"])
+    ]
+
+    if not watching:
+        await ctx.send("You're not watching any games yet!")
+        return
+
+    games_list = "\n".join(f"• {name}" for name in watching)
+    await ctx.send(f"You're watching: \n{games_list}")
+
 bot.run(token)  # Must always be at the bottom
