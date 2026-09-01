@@ -14,7 +14,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 WATCHLIST_FILE = "watchlist.json"
-last_known_discounts = {}
+LAST_DISCOUNTS_FILE = "last_discounts.json"
 
 def load_watchlist():
     try:
@@ -27,9 +27,22 @@ def save_watchlist(watchlist):
     with open(WATCHLIST_FILE, 'w') as f:
         json.dump(watchlist, f, indent=2)
 
+def load_last_discounts() :
+    try :
+        with open(LAST_DISCOUNTS_FILE, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save_last_discounts(discounts):
+    with open(LAST_DISCOUNTS_FILE, 'w') as f:
+        json.dump(discounts, f, indent=2)
+
+
 @tasks.loop(seconds=60)
 async def check_sales():
     watchlist = load_watchlist()
+    last_known_discounts = load_last_discounts()
 
     for appid, watchers in watchlist.items():
         details_url = f"https://store.steampowered.com/api/appdetails?appids={appid}"
@@ -43,7 +56,7 @@ async def check_sales():
 
         last_discount = last_known_discounts.get(appid, 0)
 
-        if discount > 0 and last_discount == 0:
+        if discount > 0 and discount != last_discount:
             notified_channels = set()
 
             for watcher in watchers:
@@ -57,6 +70,7 @@ async def check_sales():
                     notified_channels.add(channel_id)
 
         last_known_discounts[appid] = discount
+    save_last_discounts(last_known_discounts)
 
 
 @bot.event
