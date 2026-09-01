@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 import json
 import requests
+import asyncio
 
 load_dotenv()
 token = os.getenv("DISCORD_BOT_TOKEN")
@@ -70,6 +71,7 @@ async def check_sales():
                     notified_channels.add(channel_id)
 
         last_known_discounts[appid] = discount
+        await asyncio.sleep(1)
     save_last_discounts(last_known_discounts)
 
 
