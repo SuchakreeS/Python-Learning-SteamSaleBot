@@ -44,12 +44,30 @@ def save_last_discounts(discounts):
         json.dump(discounts, f, indent=2)
 
 
+# ↓↓↓ NEW ↓↓↓
+def extract_appid(text):
+    if text.isdigit():
+        return text
+
+    parts = text.split("/")
+    if "app" in parts:
+        app_index = parts.index("app")
+        return parts[app_index + 1]
+
+    return None
+# ↑↑↑ NEW ↑↑↑
+
+
 @tasks.loop(seconds=60)
 async def check_sales():
     watchlist = load_watchlist()
     last_known_discounts = load_last_discounts()
 
-    for appid, watchers in watchlist.items():
+    # ↓↓↓ CHANGED — reads new nested shape ↓↓↓
+    for appid, game_info in watchlist.items():
+        watchers = game_info["watchers"]
+    # ↑↑↑ CHANGED ↑↑↑
+
         try:
             details_url = f"https://store.steampowered.com/api/appdetails?appids={appid}"
             details_res = requests.get(details_url)
@@ -83,6 +101,7 @@ async def check_sales():
 
     save_last_discounts(last_known_discounts)
 
+
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
@@ -94,37 +113,91 @@ async def on_message(message):
     print(f"Received: {message.content} from {message.author}")
     await bot.process_commands(message)
 
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"Missing argument! Usage: `!{ctx.command} <link or appid>`")
+    else:
+        print(f"Unhandled error in command {ctx.command}: {error}")
+        await ctx.send("Something went wrong running that command.")
 
 @bot.command()
 async def ping(ctx):
     await ctx.send("Pong!")
 
 
+# ↓↓↓ CHANGED — new shape, fetches + stores name ↓↓↓
 @bot.command()
-async def watch(ctx, link):
-    try:
-        parts = link.split("/")
-        app_index = parts.index("app")
-        appid = parts[app_index + 1]
-    except ValueError:
-        await ctx.send("That doesn't look like valid steam link!!!")
+async def watch(ctx, *, game):
+    appid = extract_appid(game)
+    if appid is None:
+        await ctx.send("That doesn't look like a valid Steam link or appid!!!")
         return
 
     watchlist = load_watchlist()
 
     if appid not in watchlist:
-        watchlist[appid] = []
+        try:
+            details_url = f"https://store.steampowered.com/api/appdetails?appids={appid}"
+            details_res = requests.get(details_url)
+            details_data = details_res.json()
+            name = details_data[appid]["data"]["name"]
+        except Exception:
+            name = "Unknown Game"
 
-    already_watching = any(w["user_id"] == ctx.author.id for w in watchlist[appid])
+        watchlist[appid] = {"name": name, "watchers": []}
+
+    already_watching = any(
+        w["user_id"] == ctx.author.id for w in watchlist[appid]["watchers"]
+    )
 
     if not already_watching:
-        watchlist[appid].append(
+        watchlist[appid]["watchers"].append(
             {"user_id": ctx.author.id, "channel_id": ctx.channel.id}
         )
 
     save_watchlist(watchlist)
 
-    await ctx.send(f"Got it! watching for {appid}")
+    await ctx.send(f"Got it! Watching {watchlist[appid]['name']} (appid: {appid})")
+# ↑↑↑ CHANGED ↑↑↑
 
+
+@bot.command()
+async def unwatch(ctx, *, game):
+    watchlist = load_watchlist()
+    appid = extract_appid(game)
+
+    if appid is None:
+        matches = [
+            aid for aid, info in watchlist.items()
+            if game.lower() in info['name'].lower()
+        ]
+
+        if len(matches) == 0:
+            await ctx.send("Couldn't find a game matching that name")
+            return
+        elif len(matches) > 1:
+            names = ", ".join(watchlist[aid]["name"] for aid in matches)
+            await ctx.send(f"Multiple matches found: {names} try a more specific name")
+            return
+
+        appid = matches[0]
+
+    if appid not in watchlist:
+        await ctx.send("You're not watching that game")
+        return
+
+    name = watchlist[appid]["name"]
+
+    watchlist[appid]["watchers"] = [
+        w for w in watchlist[appid]["watchers"] if w["user_id"] != ctx.author.id
+    ]
+
+    if not watchlist[appid]["watchers"]:
+        del watchlist[appid]
+
+    save_watchlist(watchlist)
+
+    await ctx.send(f"Stopped watching {name}")
 
 bot.run(token)  # Must always be at the bottom
