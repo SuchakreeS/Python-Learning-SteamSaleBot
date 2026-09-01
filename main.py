@@ -1,45 +1,49 @@
-import requests
-import os
-from dotenv import load_dotenv
-import time
+# NOTE: This was the original single-user wishlist prototype from early development.
+# Superseded by bot.py, which supports multiple users via Discord.
+# Kept here as-is since it demonstrates debugging a real Steam API deprecation (see project log).
 
-load_dotenv()
-url = os.getenv("WISHLIST_URL")
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-}
+# import requests
+# import os
+# from dotenv import load_dotenv
+# import time
 
-res = requests.get(url, headers=headers)
-print(res.status_code)
+# load_dotenv()
+# url = os.getenv("WISHLIST_URL")
+# headers = {
+#     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+# }
 
-if res.status_code == 200:
-    data = res.json()
-    items = data['response']['items']
-    # print(res.json())
+# res = requests.get(url, headers=headers)
+# print(res.status_code)
 
-    appids = []
-    for item in items:
-        appids.append(item['appid'])
+# if res.status_code == 200:
+#     data = res.json()
+#     items = data['response']['items']
+#     # print(res.json())
 
-    print(appids)
-    print(len(appids))
+#     appids = []
+#     for item in items:
+#         appids.append(item['appid'])
 
-    wishlist_games = []
-    for appid in appids :
-        details_url = f"https://store.steampowered.com/api/appdetails?appids={appid}"
-        details_res = requests.get(details_url, headers=headers)
-        details_data = details_res.json()
+#     print(appids)
+#     print(len(appids))
 
-        appid_str = str(appid)
-        game_data = details_data[appid_str]["data"]
+#     wishlist_games = []
+#     for appid in appids :
+#         details_url = f"https://store.steampowered.com/api/appdetails?appids={appid}"
+#         details_res = requests.get(details_url, headers=headers)
+#         details_data = details_res.json()
 
-        name = game_data["name"]
-        price = game_data.get("price_overview", {}).get("final_formatted", "Free / No price listed")
+#         appid_str = str(appid)
+#         game_data = details_data[appid_str]["data"]
 
-        wishlist_games.append({"name": name, "price": price})
+#         name = game_data["name"]
+#         price = game_data.get("price_overview", {}).get("final_formatted", "Free / No price listed")
 
-        time.sleep(1)
+#         wishlist_games.append({"name": name, "price": price})
 
-    print(wishlist_games)
-else :
-    print(f"Request fail with status code {res.status_code}")
+#         time.sleep(1)
+
+#     print(wishlist_games)
+# else :
+#     print(f"Request fail with status code {res.status_code}")

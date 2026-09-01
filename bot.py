@@ -3,6 +3,7 @@ from discord.ext import commands, tasks
 import os
 from dotenv import load_dotenv
 import json
+import requests
 
 load_dotenv()
 token = os.getenv("DISCORD_BOT_TOKEN")
@@ -13,6 +14,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 WATCHLIST_FILE = "watchlist.json"
+last_known_discounts = {}
 
 def load_watchlist():
     try:
@@ -26,13 +28,41 @@ def save_watchlist(watchlist):
         json.dump(watchlist, f, indent=2)
 
 @tasks.loop(seconds=60)
-async def test_loop() :
-    print("Checking...")
+async def check_sales():
+    watchlist = load_watchlist()
+
+    for appid, watchers in watchlist.items():
+        details_url = f"https://store.steampowered.com/api/appdetails?appids={appid}"
+        details_res = requests.get(details_url)
+        details_data = details_res.json()
+
+        game_data = details_data[appid]["data"]
+        name = game_data["name"]
+        price_overview = game_data.get("price_overview", {})
+        discount = price_overview.get("discount_percent", 0)
+
+        last_discount = last_known_discounts.get(appid, 0)
+
+        if discount > 0 and last_discount == 0:
+            notified_channels = set()
+
+            for watcher in watchers:
+                user = await bot.fetch_user(watcher["user_id"])
+                await user.send(f"🔥 {name} is now {discount}% off!")
+
+                channel_id = watcher["channel_id"]
+                if channel_id not in notified_channels:
+                    channel = bot.get_channel(channel_id)
+                    await channel.send(f"🔥 {name} is now {discount}% off!")
+                    notified_channels.add(channel_id)
+
+        last_known_discounts[appid] = discount
+
 
 @bot.event
 async def on_ready() :
     print(f"Logged in as {bot.user}")
-    test_loop.start()
+    check_sales.start()
 
 @bot.event
 async def on_message(message):
@@ -59,8 +89,13 @@ async def watch(ctx, link) :
     if appid not in watchlist:
         watchlist[appid] = []
 
-    if ctx.author.id not in watchlist[appid] :
-        watchlist[appid].append(ctx.author.id)
+    already_watching = any(w["user_id"] == ctx.author.id for w in watchlist[appid])
+
+    if not already_watching:
+        watchlist[appid].append({
+            "user_id": ctx.author.id,
+            "channel_id": ctx.channel.id
+        })
 
     save_watchlist(watchlist)
 
