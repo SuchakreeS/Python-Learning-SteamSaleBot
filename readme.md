@@ -80,12 +80,6 @@ Commands and the background price-checking loop are organized as **Cogs** — `d
 
 ---
 
-## Screenshots
-
-**Watching a game and getting a live sale alert:**
-
----
-
 ## What's next
 
 - Migrate from `!` text commands to Discord slash commands with live autocomplete (e.g. `/unwatch` suggesting your watched games as you type)
