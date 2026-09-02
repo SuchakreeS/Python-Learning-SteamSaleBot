@@ -6,6 +6,7 @@ import asyncio
 
 load_dotenv()
 token = os.getenv("DISCORD_BOT_TOKEN")
+guild_id = int(os.getenv("GUILD_ID"))
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -16,6 +17,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
+
+    await bot.tree.sync()
+    print("/command synced")
 
 
 @bot.event
