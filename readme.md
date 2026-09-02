@@ -84,8 +84,6 @@ Commands and the background price-checking loop are organized as **Cogs** — `d
 
 **Watching a game and getting a live sale alert:**
 
-*(add screenshot here)*
-
 ---
 
 ## What's next
